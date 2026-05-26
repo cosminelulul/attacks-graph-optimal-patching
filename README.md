@@ -56,6 +56,7 @@ http://localhost:5000
 Serverul poate fi oprit oricând cu `Ctrl+C` în terminal.
 
 ### Licență
+Vezi [LICENSE]
 
 
 ---
@@ -109,3 +110,5 @@ http://localhost:5000
 Stop the server at any time with `Ctrl+C` in the terminal.
 
 ### License
+
+See [LICENSE]
