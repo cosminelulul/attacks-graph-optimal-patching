@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grafuri de atac si Patch Optim</title>
+<style>
+:root {
+  --bg:    #080a0f;
+  --bg2:   #0e1117;
+  --bg3:   #161b26;
+  --bg4:   #1e2433;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.12);
+  --text:  #dde1ed;
+  --muted: #6b7280;
+  --accent: #e63560;
+  --cyan:  #00c9a7;
+  --cyan2: #00ffcc;
+  --amber: #f59e0b;
+  --purple:#8b5cf6;
+  --green: #22c55e;
+  --red:   #ef4444;
+  --blue:  #3b82f6;
+  --mono:  'Courier New', monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden}
+
+/* scanlines */
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.025) 3px,rgba(0,0,0,0.025) 4px);pointer-events:none;z-index:9000}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:500}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.logo-name{font-size:18px;font-weight:700;letter-spacing:2.5px}
+.logo-sub{font-size:12px;color:var(--muted);letter-spacing:1px;margin-top:1px}
+.nav-tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:3px}
+.nav-tab{padding:5px 18px;font-size:14px;letter-spacing:1.5px;font-family:var(--mono);background:transparent;border:none;color:var(--muted);cursor:pointer;border-radius:5px;transition:all .15s}
+.nav-tab.active{background:var(--accent);color:#fff}
+.nav-tab:hover:not(.active){background:var(--bg3);color:var(--text)}
+.api-status{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--muted)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.status-dot.ok{background:var(--cyan);animation:blink 2s infinite}
+.status-dot.err{background:var(--red)}
+.header-actions{display:flex;align-items:center;gap:10px}
+.lang-btn{background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:15px;letter-spacing:1px;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s}
+.lang-btn:hover{background:var(--bg4);border-color:var(--cyan)}
+.quit-btn{margin-left:10px;padding:5px 10px;font-size:12px;letter-spacing:1.5px;font-family:var(--mono);background:transparent;border:1px solid var(--border2);border-radius:5px;color:var(--muted);cursor:pointer;transition:all .15s}
+.quit-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--accent)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Layout ── */
+main{display:flex;height:calc(100vh - 60px)}
+.section{display:none;width:100%}
+.section.active{display:flex}
+
+/* ── Graph panel ── */
+.graph-panel{flex:1;position:relative;overflow:hidden;border-right:1px solid var(--border)}
+#graph-canvas{width:100%;height:100%;display:block;cursor:default}
+
+/* ── Controls bar ── */
+.graph-controls{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:6px;background:var(--bg2);border:1px solid var(--border2);border-radius:40px;padding:7px 14px;align-items:center}
+.ctrl-btn{width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:var(--mono)}
+.ctrl-btn:hover{background:var(--accent);border-color:var(--accent)}
+.ctrl-btn:disabled{opacity:.3;cursor:default}
+.ctrl-btn.pill{width:auto;border-radius:20px;padding:0 16px;font-size:16px;letter-spacing:1.5px;background:var(--accent);border-color:var(--accent);color:#fff}
+.ctrl-btn.pill:hover{background:#f05a7e;border-color:#f05a7e}
+.ctrl-btn.pill.cyan{background:var(--cyan);border-color:var(--cyan);color:#000}
+.ctrl-btn.pill.cyan:hover{background:var(--cyan2)}
+.iter-speed{font-size:16px;color:var(--muted);padding:0 6px;display:flex;align-items:center;gap:5px}
+.iter-speed input{width:60px;accent-color:var(--cyan)}
+
+/* ── Right panel ── */
+.right-panel{width:360px;display:flex;flex-direction:column;background:var(--bg2);flex-shrink:0}
+.panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.panel-title{font-size:14px;letter-spacing:2px;color:var(--muted)}
+.iter-badge{font-size:18px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:2px 9px;color:var(--cyan)}
+.panel-body{flex:1;overflow-y:auto;padding:14px 16px}
+.panel-body::-webkit-scrollbar{width:3px}
+.panel-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── Step cards ── */
+.step-card{margin-bottom:12px;padding:11px 13px;border-radius:7px;background:var(--bg3);border-left:3px solid transparent;font-size:18px;line-height:1.75;opacity:0;transform:translateY(5px);animation:fadeup .25s forwards}
+@keyframes fadeup{to{opacity:1;transform:translateY(0)}}
+.step-card.path{border-left-color:var(--cyan)}
+.step-card.cut {border-left-color:var(--accent)}
+.step-card.done{border-left-color:var(--green)}
+.step-card.info{border-left-color:var(--purple)}
+.step-card.warn{border-left-color:var(--amber)}
+.step-tag{display:inline-block;font-size:13px;letter-spacing:1.5px;padding:1px 7px;border-radius:3px;margin-bottom:5px}
+.tag-PATH{background:rgba(0,201,167,.15);color:var(--cyan)}
+.tag-CUT {background:rgba(230,53,96,.15);color:var(--accent)}
+.tag-DONE{background:rgba(34,197,94,.15);color:var(--green)}
+.tag-INFO{background:rgba(139,92,246,.15);color:var(--purple)}
+.tag-WARN{background:rgba(245,158,11,.15);color:var(--amber)}
+.val{color:var(--cyan2);font-weight:bold}
+.nd {color:var(--amber);font-style:normal}
+.ed {color:#f05a7e}
+
+/* ── Result cards ── */
+.result-bar{padding:13px 16px;border-top:1px solid var(--border);flex-shrink:0}
+.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
+.res-card{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
+.res-label{font-size:13px;letter-spacing:1.5px;color:var(--muted);margin-bottom:3px}
+.res-val{font-size:32px;color:var(--cyan);font-weight:bold}
+.res-val.red{color:var(--accent)}
+.res-val.amber{color:var(--amber)}
+.res-val.green{color:var(--green)}
+.export-btn{width:100%;padding:7px;font-size:14px;letter-spacing:1.5px;font-family:var(--mono);background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);cursor:pointer;transition:all .15s;margin-top:4px}
+.export-btn:hover{background:var(--bg3);color:var(--text);border-color:var(--cyan)}
+
+/* ── Hungarian section ── */
+#sec-hun{flex-direction:row}
+.hun-left{flex:1;overflow-y:auto;padding:20px 22px}
+.hun-right{width:360px;display:flex;flex-direction:column;background:var(--bg2);border-left:1px solid var(--border)}
+.section-title{font-size:12px;letter-spacing:2px;color:var(--muted);margin-bottom:14px}
+
+/* Matrix */
+.cost-matrix{border-collapse:collapse;font-size:22px;width:100%;margin-bottom:20px}
+.cost-matrix th,.cost-matrix td{border:1px solid var(--border);padding:7px 10px;text-align:center;transition:background .35s,color .35s}
+.cost-matrix th{font-size:16px;letter-spacing:1px;color:var(--muted);border:none;padding-bottom:6px}
+.cost-matrix td{border-radius:3px}
+.cost-matrix .rh{text-align:right;padding-right:10px;color:var(--muted);font-size:18px;border:none}
+.cell-optimal{background:rgba(0,201,167,.18)!important;color:var(--cyan)!important;border-color:var(--cyan)!important;font-weight:bold}
+.cell-covrow{background:rgba(139,92,246,.1)!important}
+.cell-covcol{background:rgba(245,158,11,.1)!important}
+.cell-star{color:var(--cyan);font-weight:bold}
+.cell-prime{color:var(--amber);font-weight:bold}
+.cell-zero{color:var(--purple)}
+
+.assign-list{display:flex;flex-direction:column;gap:7px;margin-top:16px}
+.assign-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;font-size:19px;opacity:0;animation:fadeup .3s forwards}
+.assign-item.best{border-color:var(--cyan);background:rgba(0,201,167,.05)}
+.assign-cost{margin-left:auto;color:var(--amber);font-size:18px}
+.assign-arrow{color:var(--muted)}
+
+/* Legend */
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.lg-item{display:flex;align-items:center;gap:5px;font-size:14px;color:var(--muted)}
+.lg-dot{width:9px;height:9px;border-radius:50%}
+
+/* Loading overlay */
+.loading{position:absolute;inset:0;background:rgba(8,10,15,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:100}
+.loading.show{display:flex}
+.spinner{width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--cyan);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-txt{font-size:15px;color:var(--cyan);letter-spacing:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">👾</div>
+    <div>
+      <div class="logo-name" data-ro="GRAFURI DE ATAC SIM" data-en="ATTACK GRAPH SIM">GRAFURI DE ATAC SIM</div>
+      <div class="logo-sub" data-ro="FORD-FULKERSON · MIN-CUT · HUNGARIAN" data-en="FORD-FULKERSON · MIN-CUT · HUNGARIAN">FORD-FULKERSON · MIN-CUT · HUNGARIAN</div>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchSection('aff')" data-ro="⚔ GRAFURI DE ATAC" data-en="⚔ ATTACK GRAPHS">⚔ GRAFURI DE ATAC</button>
+    <button class="nav-tab" onclick="switchSection('hun')" data-ro="🛡 PATCHING OPTIM" data-en="🛡 OPTIMAL PATCHING">🛡 PATCHING OPTIM</button>
+  </div>
+  <div class="header-actions">
+    <button id="lang-btn" class="lang-btn" onclick="toggleLang()" title="Schimbă limba / Switch language" data-ro-title="Schimbă limba" data-en-title="Switch language">RO</button>
+    <div class="api-status">
+      <div class="status-dot" id="api-dot"></div>
+      <span id="api-status-txt" data-ro="Conectare API..." data-en="Connecting API...">Conectare API...</span>
+      <button class="quit-btn" onclick="shutdownApp()" data-ro="INCHIDE" data-en="EXIT">INCHIDE</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ══════════ SECTION: Attack Graph (Ford-Fulkerson) ══════════ -->
+<div id="sec-aff" class="section active">
+  <div class="graph-panel">
+    <canvas id="graph-canvas"></canvas>
+    <div class="loading" id="aff-loading">
+      <div class="spinner"></div>
+      <div class="loading-txt" id="loading-msg" data-ro="SE CALCULEAZĂ..." data-en="COMPUTING...">SE CALCULEAZĂ...</div>
+    </div>
+    <div class="graph-controls">
+      <button class="ctrl-btn" id="btn-new-net" title="Retea nouă" data-ro-title="Rețea nouă" data-en-title="New network" onclick="fetchNewNetwork()">↺</button>
+      <button class="ctrl-btn" id="btn-prev" onclick="stepBack()" disabled>◀</button>
+      <button class="ctrl-btn pill" id="btn-solve" onclick="fetchAndSolve()" data-ro="▶ REZOLVĂ" data-en="▶ SOLVE">▶ REZOLVĂ</button>
+      <button class="ctrl-btn" id="btn-play" title="Play/Pause" onclick="togglePlay()">⏵</button>
+      <button class="ctrl-btn" id="btn-next" onclick="stepForward()" disabled>▶</button>
+      <button class="ctrl-btn" id="btn-last" onclick="goToEnd()" disabled>▶▶</button>
+      <div class="iter-speed">
+        <span id="lbl-speed" data-ro="viteza" data-en="speed">viteza</span> <input type="range" min="200" max="2000" value="800" id="speed-slider" title="Viteza animație (ms)">
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="panel-header">
+      <span class="panel-title" id="lbl-ff-title" data-ro="ITERAȚII FORD-FULKERSON" data-en="FORD-FULKERSON ITERATIONS">ITERAȚII FORD-FULKERSON</span>
+      <span class="iter-badge" id="iter-badge">—</span>
+    </div>
+    <div class="panel-body" id="iter-log"></div>
+    <div class="result-bar">
+      <div class="result-grid">
+        <div class="res-card"><div class="res-label" id="lbl-max-flow" data-ro="FLUX MAXIM" data-en="MAX FLOW">FLUX MAXIM</div><div class="res-val" id="res-flow">—</div></div>
+        <div class="res-card"><div class="res-label" id="lbl-min-cut" data-ro="TĂIETURĂ MIN" data-en="MIN CUT">TĂIETURĂ MIN</div><div class="res-val red" id="res-cut">—</div></div>
+        <div class="res-card"><div class="res-label" id="lbl-iters" data-ro="ITERAȚII" data-en="ITERATIONS">ITERAȚII</div><div class="res-val amber" id="res-iter">—</div></div>
+        <div class="res-card"><div class="res-label" id="lbl-crit-vuln" data-ro="VULNERAB. CRITICE" data-en="CRITICAL VULNS">VULNERAB. CRITICE</div><div class="res-val red" id="res-vuln">—</div></div>
+      </div>
+      <button class="export-btn" id="btn-export-aff" onclick="exportLog('aff')" data-ro="⬇ EXPORT LOG COMPLET AFF" data-en="⬇ EXPORT FULL LOG AFF">⬇ EXPORT LOG COMPLET AFF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SECTION: Hungarian Algorithm ══════════ -->
+<div id="sec-hun" class="section">
+  <div class="hun-left">
+    <div class="section-title" id="lbl-hun-title" data-ro="ALOCARE EXPERȚI → VULNERABILITĂȚI  (ALGORITMUL UNGAR)" data-en="EXPERT → VULNERABILITY ASSIGNMENT  (HUNGARIAN ALGORITHM)">ALOCARE EXPERȚI → VULNERABILITĂȚI  (ALGORITMUL UNGAR)</div>
+
+    <div class="legend">
+      <div class="lg-item"><div class="lg-dot" style="background:rgba(0,201,167,.8)"></div><span data-ro="Atribuit optimal" data-en="Optimal assignment">Atribuit optimal</span></div>
+      <div class="lg-item"><div class="lg-dot" style="background:rgba(139,92,246,.5)"></div><span data-ro="Linie acoperită" data-en="Covered row">Linie acoperită</span></div>
+      <div class="lg-item"><div class="lg-dot" style="background:rgba(245,158,11,.5)"></div><span data-ro="Coloană acoperită" data-en="Covered column">Coloană acoperită</span></div>
+      <div class="lg-item"><div class="lg-dot" style="background:rgba(230,53,96,.5)"></div><span data-ro="Zero prim (′)" data-en="Prime zero (′)">Zero prim (′)</span></div>
+      <div class="lg-item"><div class="lg-dot" style="background:rgba(0,201,167,.4)"></div><span data-ro="Zero star (★)" data-en="Star zero (★)">Zero star (★)</span></div>
+    </div>
+
+    <div id="hun-matrix-wrap"></div>
+    <div id="hun-assign-wrap"></div>
+  </div>
+
+  <div class="hun-right">
+    <div class="panel-header">
+      <span class="panel-title" id="lbl-hun-iters" data-ro="ITERAȚII UNGAR" data-en="HUNGARIAN ITERATIONS">ITERAȚII UNGAR</span>
+      <span class="iter-badge" id="hun-badge">—</span>
+    </div>
+    <div class="panel-body" id="hun-log"></div>
+    <div class="result-bar">
+      <div class="result-grid">
+        <div class="res-card"><div class="res-label" id="lbl-hun-cost" data-ro="COST TOTAL (ore)" data-en="TOTAL COST (hrs)">COST TOTAL (ore)</div><div class="res-val green" id="hun-cost">—</div></div>
+        <div class="res-card"><div class="res-label" id="lbl-hun-count" data-ro="EXPERȚI ALOCAȚI" data-en="EXPERTS ASSIGNED">EXPERȚI ALOCAȚI</div><div class="res-val amber" id="hun-count">—</div></div>
+      </div>
+      <button class="export-btn" id="btn-hun-solve" style="border-color:var(--cyan);color:var(--cyan);margin-bottom:5px" onclick="fetchHungarian()" data-ro="▶ REZOLVĂ (API)" data-en="▶ SOLVE (API)">▶ REZOLVĂ (API)</button>
+      <button class="export-btn" id="btn-export-hun" onclick="exportLog('hun')" data-ro="⬇ EXPORT LOG COMPLET AU" data-en="⬇ EXPORT FULL LOG HUN">⬇ EXPORT LOG COMPLET AU</button>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const API_BASE = 'http://localhost:5000/api';
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let networkData = null;   // {nodes, edges, source, sink}
+let solveResult = null;   // raspuns complet de la /api/ff/solve
+let iterHistory = [];     // pasi iterativi pentru animatie
+let currentStep = -1;
+let affLogLines = [];
+let hunLogLines = [];
+let playTimer = null;
+let isPlaying = false;
+
+// Hungarian data
+const EXPERTS = ['🔐 Mihai', '⚙️ Elena', '🛡 Andrei', '🔬 Ioana', '💡 Radu'];
+const VULNS   = ['🐛 SQLi', '🔓 RCE', '🪝 XSS', '🔑 AuthBypass', '📡 SSRF'];
+let hunMatrix = [];
+let hunResult = null;
+
+const I18N = {
+  ro: {
+    apiActive: 'API activ',
+    apiOffline: 'API offline',
+    loadingGenerate: 'GENERÂND REȚEAUA...',
+    loadingSolve: 'RULÂND FORD-FULKERSON...',
+    errGenerate: 'Eroare la generare retea: {msg}\n\nAsigurati-va ca serverul Flask ruleaza (python app.py)',
+    errSolve: 'Eroare la rezolvare: {msg}',
+    errHun: 'Eroare Hungarian: {msg}',
+    confirmClose: 'Sigur doresti sa inchizi aplicatia?',
+    exportNeedRun: 'Rulati algoritmul mai intai.',
+    ffHeader: '═══ FORD-FULKERSON — GRAFURI DE ATAC ═══',
+    sourceNode: 'Sursa: Nod #{id}',
+    sinkNode: 'Destinatie: Nod #{id}',
+    nodeCount: 'Noduri: {nodes}, Arce: {edges}',
+    iterHeader: '─── ITERATII ───',
+    iterPath: 'It.{iter}: Drum: {path}, delta={delta}, flux total={flow}',
+    iterStop: 'It.{iter}: STOP (niciun drum de ameliorare)',
+    minCutHeader: '─── TAIETURA MINIMA (VULNERABILITATI CRITICE) ───',
+    cutArc: '  Arc: {from} → {to}  (cap={cap}, flux={flow})',
+    maxFlowLine: 'Flux Maxim = {val}',
+    cutCapLine: 'Capacitate Taietura = {val}',
+    verifyLine: 'Verificare: fmax = CT = {val}',
+    iterBadge: 'IT {n}',
+    iterFinal: 'FINAL',
+    minCutTag: 'MIN-CUT',
+    conclusionTag: 'CONCLUZIE',
+    maxFlowLabel: 'Flux Maxim',
+    minCutLabel: 'Tăietură Minimă',
+    criticalEdges: '{n} arce critice',
+    fixAdvice: 'Repara aceste conexiuni pentru a izola atacatorul de baza de date!',
+    pathTag: 'DRUM {n}',
+    deltaLabel: 'δ (flux augmentat):',
+    flowTotalLabel: 'Flux total:',
+    hunHeader: '═══ ALGORITMUL UNGAR — PATCHING OPTIM ═══',
+    expertsLine: 'Experti: {list}',
+    vulnsLine: 'Vulnerabilitati: {list}',
+    costMatrixLine: 'Matrice costuri (ore de remediere):',
+    matrixRow: '  {expert}: [{row}]',
+    hunFinalHeader: '─── ALOCARE FINALA ───',
+    hunTotalCost: 'Cost total minim: {val} ore',
+    hunIterLine: '  Pas {n}: {desc} (n0={n0}/{n})',
+    hunStepBadge: 'PAS {cur}/{total}',
+    tagDone: 'DONE',
+    tagInfo: 'INFO',
+    stepLabel: 'Pas {n}:',
+    zeroesLabel: 'Zerouri încadrate:',
+    assignLine: '  {expert} → {vuln}  ({cost} ore)',
+  },
+  en: {
+    apiActive: 'API active',
+    apiOffline: 'API offline',
+    loadingGenerate: 'GENERATING NETWORK...',
+    loadingSolve: 'RUNNING FORD-FULKERSON...',
+    errGenerate: 'Error generating network: {msg}\n\nMake sure the Flask server is running (python app.py)',
+    errSolve: 'Error solving: {msg}',
+    errHun: 'Hungarian error: {msg}',
+    confirmClose: 'Are you sure you want to close the app?',
+    exportNeedRun: 'Run the algorithm first.',
+    ffHeader: '═══ FORD-FULKERSON — ATTACK GRAPHS ═══',
+    sourceNode: 'Source: Node #{id}',
+    sinkNode: 'Sink: Node #{id}',
+    nodeCount: 'Nodes: {nodes}, Edges: {edges}',
+    iterHeader: '─── ITERATIONS ───',
+    iterPath: 'It.{iter}: Path: {path}, delta={delta}, total flow={flow}',
+    iterStop: 'It.{iter}: STOP (no augmenting path)',
+    minCutHeader: '─── MIN CUT (CRITICAL VULNERABILITIES) ───',
+    cutArc: '  Arc: {from} → {to}  (cap={cap}, flow={flow})',
+    maxFlowLine: 'Max Flow = {val}',
+    cutCapLine: 'Cut Capacity = {val}',
+    verifyLine: 'Check: fmax = CT = {val}',
+    iterBadge: 'IT {n}',
+    iterFinal: 'FINAL',
+    minCutTag: 'MIN-CUT',
+    conclusionTag: 'CONCLUSION',
+    maxFlowLabel: 'Max Flow',
+    minCutLabel: 'Min Cut',
+    criticalEdges: '{n} critical edges',
+    fixAdvice: 'Fix these connections to isolate the attacker from the database!',
+    pathTag: 'PATH {n}',
+    deltaLabel: 'δ (augmented flow):',
+    flowTotalLabel: 'Total flow:',
+    hunHeader: '═══ HUNGARIAN ALGORITHM — OPTIMAL PATCHING ═══',
+    expertsLine: 'Experts: {list}',
+    vulnsLine: 'Vulnerabilities: {list}',
+    costMatrixLine: 'Cost matrix (repair hours):',
+    matrixRow: '  {expert}: [{row}]',
+    hunFinalHeader: '─── FINAL ASSIGNMENT ───',
+    hunTotalCost: 'Minimum total cost: {val} hours',
+    hunIterLine: '  Step {n}: {desc} (n0={n0}/{n})',
+    hunStepBadge: 'STEP {cur}/{total}',
+    tagDone: 'DONE',
+    tagInfo: 'INFO',
+    stepLabel: 'Step {n}:',
+    zeroesLabel: 'Starred zeros:',
+    assignLine: '  {expert} → {vuln}  ({cost} hrs)',
+  },
+};
+
+function t(key, vars = {}) {
+  const dict = I18N[currentLang] || I18N.ro;
+  let str = dict[key] || I18N.ro[key] || key;
+  Object.entries(vars).forEach(([k, v]) => {
+    str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+  });
+  return str;
+}
+
+// ═══════════════════════════════════════════
+// API HEALTH CHECK
+// ═══════════════════════════════════════════
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API_BASE}/health`, {signal: AbortSignal.timeout(3000)});
+    const d = await r.json();
+    if (d.status === 'ok') {
+      document.getElementById('api-dot').className = 'status-dot ok';
+      document.getElementById('api-status-txt').textContent = t('apiActive');
+    }
+  } catch {
+    document.getElementById('api-dot').className = 'status-dot err';
+    document.getElementById('api-status-txt').textContent = t('apiOffline');
+  }
+}
+
+// ═══════════════════════════════════════════
+// NETWORK GENERATION  —  GET FROM API
+// ═══════════════════════════════════════════
+async function fetchNewNetwork() {
+  showLoading(true, {ro: I18N.ro.loadingGenerate, en: I18N.en.loadingGenerate});
+  resetState();
+  try {
+    const r = await fetch(`${API_BASE}/ff/generate`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({})
+    });
+    const d = await r.json();
+    if (d.status !== 'ok') throw new Error(d.mesaj);
+    networkData = d;
+    layoutNodes();
+    drawGraph([], []);
+  } catch(e) {
+    alert(t('errGenerate', {msg: e.message}));
+  }
+  showLoading(false);
+}
+
+// ═══════════════════════════════════════════
+// SOLVE FF  —  SEND TO API
+// ═══════════════════════════════════════════
+async function fetchAndSolve() {
+  if (!networkData) { await fetchNewNetwork(); }
+  showLoading(true, {ro: I18N.ro.loadingSolve, en: I18N.en.loadingSolve});
+  resetIterState();
+
+  affLogLines = [];
+  affLogLines.push(t('ffHeader'));
+  affLogLines.push(t('sourceNode', {id: networkData.source}));
+  affLogLines.push(t('sinkNode', {id: networkData.sink}));
+  affLogLines.push(t('nodeCount', {nodes: networkData.nodes.length, edges: networkData.edges.length}));
+  affLogLines.push('');
+
+  try {
+    const r = await fetch(`${API_BASE}/ff/solve`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        nodes:  networkData.nodes,
+        edges:  networkData.edges,
+        source: networkData.source,
+        sink:   networkData.sink,
+      })
+    });
+    const d = await r.json();
+    if (d.status !== 'ok') throw new Error(d.mesaj);
+    solveResult = d.data;
+
+    // Construieste pasii iterativi
+    buildIterHistory(solveResult);
+
+    // Afiseaza rezultate finale
+    document.getElementById('res-flow').textContent = solveResult.flux_maxim;
+    document.getElementById('res-cut').textContent  = solveResult.taietura_minima.length;
+    document.getElementById('res-iter').textContent = solveResult.ISTOP;
+    document.getElementById('res-vuln').textContent = solveResult.taietura_minima.length;
+
+    // Log
+    affLogLines.push(t('iterHeader'));
+    for (const it of solveResult.iteratii) {
+      if (it.drum && it.drum.length > 0) {
+        const drumStr = it.drum.map(([a,b,s])=>`${a}${s}${b}`).join(' → ');
+        affLogLines.push(t('iterPath', {iter: it.iteratie, path: drumStr, delta: it.delta, flow: it.flux_dupa}));
+      } else {
+        affLogLines.push(t('iterStop', {iter: it.iteratie}));
+      }
+    }
+    affLogLines.push('');
+    affLogLines.push(t('minCutHeader'));
+    for (const tmin of solveResult.taietura_minima) {
+      affLogLines.push(t('cutArc', {
+        from: tmin.nod_from,
+        to: tmin.nod_to,
+        cap: tmin.capacitate,
+        flow: tmin.flux,
+      }));
+    }
+    affLogLines.push(`\n${t('maxFlowLine', {val: solveResult.flux_maxim})}`);
+    affLogLines.push(t('cutCapLine', {val: solveResult.cap_taietura}));
+    affLogLines.push(t('verifyLine', {val: solveResult.flux_maxim}));
+
+    setNavBtns(false, iterHistory.length > 0);
+    stepForward();
+  } catch(e) {
+    alert(t('errSolve', {msg: e.message}));
+  }
+  showLoading(false);
+}
+
+// ═══════════════════════════════════════════
+// BUILD ITERATION HISTORY FOR ANIMATION
+// ═══════════════════════════════════════════
+function buildIterHistory(result) {
+  iterHistory = [];
+
+  // Reconstruim fluxul progresiv din iteratii
+  const fluxState = {};
+  for (const e of networkData.edges) fluxState[`${e.from}__${e.to}`] = 0;
+
+  for (const it of result.iteratii) {
+    if (!it.stop && it.drum.length > 0) {
+      // Path nodes pentru highlight
+      const pathNodes = new Set();
+      const pathEdges = new Set();
+      pathNodes.add(String(networkData.source));
+      for (const [a, b, s] of it.drum) {
+        pathNodes.add(String(a));
+        pathNodes.add(String(b));
+        if (s === '+') pathEdges.add(`${a}__${b}`);
+      }
+      // Update flux
+      if (it.delta > 0) {
+        for (const [a, b, s] of it.drum) {
+          if (s === '+') fluxState[`${a}__${b}`] = (fluxState[`${a}__${b}`]||0) + it.delta;
+        }
+      }
+      iterHistory.push({
+        type: 'path',
+        iteratie: it.iteratie,
+        drum: it.drum,
+        delta: it.delta,
+        fluxDupa: it.flux_dupa,
+        pathNodes,
+        pathEdges,
+        fluxState: {...fluxState},
+        cut: [],
+      });
+    } else if (it.stop) {
+      // Final — arata taietura
+      const cutEdges = new Set(result.taietura_minima.map(t=>`${t.from}__${t.to}`));
+      iterHistory.push({
+        type: 'cut',
+        iteratie: 'FINAL',
+        fluxState: {...fluxState},
+        pathNodes: new Set(),
+        pathEdges: new Set(),
+        cut: result.taietura_minima,
+        cutEdges,
+        fluxMaxim: result.flux_maxim,
+        taietura: result.taietura_minima,
+        vulnerabilitati: result.vulnerabilitati_critice,
+      });
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+function stepForward() {
+  if (currentStep >= iterHistory.length-1) return;
+  currentStep++;
+  renderStep(currentStep);
+  setNavBtns(currentStep > 0, currentStep < iterHistory.length-1);
+  if (currentStep >= iterHistory.length-1 && isPlaying) {
+    stopPlay();
+  }
+}
+function stepBack() {
+  if (currentStep <= 0) return;
+  stopPlay();
+  currentStep--;
+  renderStep(currentStep);
+  setNavBtns(currentStep > 0, currentStep < iterHistory.length-1);
+}
+function goToEnd() {
+  stopPlay();
+  currentStep = iterHistory.length-1;
+  renderStep(currentStep);
+  setNavBtns(true, false);
+}
+function setNavBtns(prev, next) {
+  document.getElementById('btn-prev').disabled = !prev;
+  document.getElementById('btn-next').disabled = !next;
+  document.getElementById('btn-last').disabled = !next;
+}
+
+// ═══════════════════════════════════════════
+// PLAY / PAUSE
+// ═══════════════════════════════════════════
+function togglePlay() {
+  if (!iterHistory || iterHistory.length === 0) return;
+  if (isPlaying) {
+    stopPlay();
+  } else {
+    startPlay();
+  }
+}
+
+function startPlay() {
+  if (isPlaying) return;
+  isPlaying = true;
+  updatePlayBtn();
+  playLoop();
+}
+
+function stopPlay() {
+  isPlaying = false;
+  if (playTimer) {
+    clearTimeout(playTimer);
+    playTimer = null;
+  }
+  updatePlayBtn();
+}
+
+function playLoop() {
+  if (!isPlaying) return;
+  if (currentStep < iterHistory.length - 1) {
+    stepForward();
+  }
+  if (currentStep >= iterHistory.length - 1) {
+    stopPlay();
+    return;
+  }
+  const delay = parseInt(document.getElementById('speed-slider').value, 10) || 800;
+  playTimer = setTimeout(playLoop, delay);
+}
+
+function updatePlayBtn() {
+  const btn = document.getElementById('btn-play');
+  if (!btn) return;
+  btn.textContent = isPlaying ? '⏸' : '⏵';
+}
+
+// ═══════════════════════════════════════════
+// RENDER STEP
+// ═══════════════════════════════════════════
+function renderStep(idx) {
+  const step = iterHistory[idx];
+  if (!step) return;
+
+  document.getElementById('iter-badge').textContent =
+    step.type === 'cut' ? t('iterFinal') : t('iterBadge', {n: step.iteratie});
+
+  drawGraph(step.pathEdges||new Set(), step.cutEdges||new Set(), step.fluxState||{});
+
+  const log = document.getElementById('iter-log');
+  const existing = log.querySelector(`[data-step="${idx}"]`);
+  if (!existing) {
+    const div = document.createElement('div');
+    div.dataset.step = idx;
+
+    if (step.type === 'cut') {
+      div.className = 'step-card cut';
+      const vulns = step.vulnerabilitati.map(v=>`<br>  <span class="ed">⚠ ${v}</span>`).join('');
+      div.innerHTML = `<span class="step-tag tag-CUT">${t('minCutTag')}</span><br>
+        ${t('maxFlowLabel')}: <span class="val">${step.fluxMaxim}</span><br>
+        ${t('minCutLabel')}: <span class="val">${t('criticalEdges', {n: step.taietura.length})}</span>${vulns}
+        <br><br><span class="step-tag tag-DONE">${t('conclusionTag')}</span><br>
+        ${t('fixAdvice')}`;
+    } else {
+      const drumHtml = step.drum.map(([a,b,s])=>`<span class="nd">${a}</span><span class="ed">${s==='+'?'→':'←'}</span><span class="nd">${b}</span>`).join(' ');
+      div.className = 'step-card path';
+      div.innerHTML = `<span class="step-tag tag-PATH">${t('pathTag', {n: step.iteratie})}</span><br>
+        ${drumHtml}<br>
+        ${t('deltaLabel')} <span class="val">+${step.delta}</span><br>
+        ${t('flowTotalLabel')} <span class="val">${step.fluxDupa}</span>`;
+    }
+    log.appendChild(div);
+    div.scrollIntoView({behavior:'smooth', block:'end'});
+  }
+}
+
+// ═══════════════════════════════════════════
+// CANVAS — LAYOUT & DRAW
+// ═══════════════════════════════════════════
+function layoutNodes() {
+  if (!networkData) return;
+  const canvas = document.getElementById('graph-canvas');
+  const W = canvas.width, H = canvas.height;
+
+  const layers = {};
+  for (const n of networkData.nodes) {
+    if (!layers[n.layer]) layers[n.layer] = [];
+    layers[n.layer].push(n);
+  }
+
+  const layerKeys = Object.keys(layers).map(Number).sort((a,b)=>a-b);
+  const totalLayers = layerKeys.length;
+
+  for (const lk of layerKeys) {
+    const lNodes = layers[lk];
+    const cnt = lNodes.length;
+    const lx = 70 + (lk / (totalLayers-1)) * (W-140);
+    lNodes.forEach((n, i) => {
+      n.x = lx;
+      n.y = H*0.12 + (cnt===1 ? H*0.38 : (i/(cnt-1))*H*0.76);
+    });
+  }
+}
+
+function drawGraph(pathEdges=new Set(), cutEdges=new Set(), fluxState={}) {
+  if (!networkData) return;
+  // Normalize inputs to Sets to avoid .has errors when arrays/undefined are passed in.
+  const pathEdgeSet = (pathEdges instanceof Set)
+    ? pathEdges
+    : Array.isArray(pathEdges)
+      ? new Set(pathEdges)
+      : new Set();
+  const cutEdgeSet = (cutEdges instanceof Set)
+    ? cutEdges
+    : Array.isArray(cutEdges)
+      ? new Set(cutEdges)
+      : new Set();
+  const canvas = document.getElementById('graph-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid dots
+  ctx.fillStyle = 'rgba(255,255,255,0.025)';
+  for (let x=0; x<W; x+=36) for (let y=0; y<H; y+=36) {
+    ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Edges
+  for (const e of networkData.edges) {
+    const fn = networkData.nodes.find(n=>n.id===e.from);
+    const tn = networkData.nodes.find(n=>n.id===e.to);
+    if (!fn||!tn) continue;
+    const key = `${e.from}__${e.to}`;
+    const inPath = pathEdgeSet.has(key);
+    const inCut  = cutEdgeSet.has(key);
+    const flow   = fluxState[key] || 0;
+    const sat    = flow >= e.capacitate && e.capacitate > 0;
+    drawEdge(ctx, fn, tn, e.capacitate, flow, inPath, inCut, sat);
+  }
+
+  // Nodes
+  for (const n of networkData.nodes) {
+    const isSource = n.id === networkData.source;
+    const isSink   = n.id === networkData.sink;
+    const inPath   = [...pathEdgeSet].some(k=>k.startsWith(`${n.id}__`)||k.endsWith(`__${n.id}`));
+    drawNode(ctx, n, isSource, isSink, inPath);
+  }
+}
+
+function drawEdge(ctx, fn, tn, cap, flow, inPath, inCut, sat) {
+  const dx=tn.x-fn.x, dy=tn.y-fn.y, dist=Math.sqrt(dx*dx+dy*dy);
+  if (dist<1) return;
+  const r=35;
+  const sx=fn.x+(dx/dist)*r, sy=fn.y+(dy/dist)*r;
+  const ex=tn.x-(dx/dist)*r, ey=tn.y-(dy/dist)*r;
+  const cx=(sx+ex)/2 - dy*0.12, cy=(sy+ey)/2 + dx*0.12;
+
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.quadraticCurveTo(cx,cy,ex,ey);
+  let color = inCut ? '#e63560' : inPath ? '#00ffcc' : sat ? 'rgba(230,53,96,.55)' : flow>0 ? 'rgba(0,201,167,.45)' : 'rgba(255,255,255,.1)';
+  ctx.strokeStyle=color; ctx.lineWidth=inCut||inPath?2.8:1.5; ctx.stroke();
+
+  // Arrowhead
+  const t2=.82;
+  const ax=(1-t2)*(1-t2)*sx+2*(1-t2)*t2*cx+t2*t2*ex;
+  const ay=(1-t2)*(1-t2)*sy+2*(1-t2)*t2*cy+t2*t2*ey;
+  const adx=2*(1-t2)*(cx-sx)+2*t2*(ex-cx);
+  const ady=2*(1-t2)*(cy-sy)+2*t2*(ey-cy);
+  const ang=Math.atan2(ady,adx);
+  ctx.save(); ctx.translate(ax,ay); ctx.rotate(ang);
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-9,-4); ctx.lineTo(-9,4);
+  ctx.closePath(); ctx.fillStyle=color; ctx.fill(); ctx.restore();
+
+  // Label flow/cap
+  const lx=(sx+ex)/2 - dy*0.15;
+  const ly=(sy+ey)/2 + dx*0.15;
+  ctx.font='13px Courier New';
+  ctx.fillStyle=inPath?'#00ffcc':flow>0?'#f59e0b':'rgba(255,255,255,.3)';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(`${Math.round(flow)}/${cap}`, lx, ly);
+}
+
+function drawNode(ctx, n, isSource, isSink, inPath) {
+  const r=35;
+  ctx.save(); ctx.translate(n.x, n.y);
+
+  // Glow
+  if (isSource||isSink||inPath) {
+    const gc=isSource?'#e63560':isSink?'#00c9a7':'#00ffcc';
+    const gr=ctx.createRadialGradient(0,0,r*.4,0,0,r*2);
+    gr.addColorStop(0,gc+'50'); gr.addColorStop(1,'transparent');
+    ctx.beginPath(); ctx.arc(0,0,r*2,0,Math.PI*2); ctx.fillStyle=gr; ctx.fill();
+  }
+
+  // Circle
+  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+  ctx.fillStyle=isSource?'#2d0d18':isSink?'#0a2820':inPath?'#0a2820':'#161b26';
+  ctx.fill();
+  ctx.strokeStyle=isSource?'#e63560':isSink?'#00c9a7':inPath?'#00ffcc':'rgba(255,255,255,.18)';
+  ctx.lineWidth=isSource||isSink||inPath?2.5:1.2; ctx.stroke();
+
+  // Emoji
+  ctx.font='20px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(n.emoji, 0, 0);
+
+  // ID label
+  ctx.font='14px Courier New';
+  ctx.fillStyle=isSource?'#e63560':isSink?'#00c9a7':'rgba(255,255,255,.4)';
+  ctx.fillText(n.label, 0, r+11);
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════
+// HUNGARIAN — API CALL
+// ═══════════════════════════════════════════
+function initHunMatrix() {
+  hunMatrix = Array.from({length:5}, () =>
+    Array.from({length:5}, () => 1 + Math.floor(Math.random()*9))
+  );
+  renderHunMatrix(hunMatrix, [], [], [], [], []);
+  document.getElementById('hun-log').innerHTML = '';
+  document.getElementById('hun-badge').textContent = '—';
+  document.getElementById('hun-cost').textContent = '—';
+  document.getElementById('hun-count').textContent = '—';
+  document.getElementById('hun-assign-wrap').innerHTML = '';
+}
+
+async function fetchHungarian() {
+  hunLogLines = [];
+  hunLogLines.push(t('hunHeader'));
+  hunLogLines.push(t('expertsLine', {list: EXPERTS.join(', ')}));
+  hunLogLines.push(t('vulnsLine', {list: VULNS.join(', ')}));
+  hunLogLines.push(t('costMatrixLine'));
+  hunMatrix.forEach((row,i)=>hunLogLines.push(t('matrixRow', {expert: EXPERTS[i], row: row.join(', ')})));
+  hunLogLines.push('');
+
+  try {
+    const r = await fetch(`${API_BASE}/hun/solve`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({matrice:hunMatrix, experti:EXPERTS, vulnerabilitati:VULNS})
+    });
+    const d = await r.json();
+    if (d.status!=='ok') throw new Error(d.mesaj);
+    hunResult = d.data;
+
+    document.getElementById('hun-cost').textContent  = hunResult.valoare;
+    document.getElementById('hun-count').textContent = hunResult.alocare.length;
+
+    // Animate matrix steps
+    animateHunMatrix(hunResult.iteratii, hunResult);
+
+    hunLogLines.push(t('iterHeader'));
+    for (const it of hunResult.iteratii) {
+      hunLogLines.push(t('hunIterLine', {n: it.iteratie + 1, desc: it.descriere, n0: it.n0, n: it.n}));
+    }
+    hunLogLines.push('');
+    hunLogLines.push(t('hunFinalHeader'));
+    for (const a of hunResult.alocare) {
+      hunLogLines.push(t('assignLine', {expert: a.expert, vuln: a.vuln, cost: a.cost}));
+    }
+    hunLogLines.push(t('hunTotalCost', {val: hunResult.valoare}));
+
+  } catch(e) {
+    alert(t('errHun', {msg: e.message}));
+  }
+}
+
+function animateHunMatrix(iteratii, finalResult) {
+  const log = document.getElementById('hun-log');
+  log.innerHTML = '';
+  let i=0;
+  const go=()=>{
+    if (i>=iteratii.length) {
+      renderHunMatrix(hunMatrix, [], [], [], [], finalResult.cuplaj);
+      renderAssignment(finalResult.alocare);
+      return;
+    }
+    const it=iteratii[i];
+    const mat = it.matrice_curenta && it.matrice_curenta.length ? it.matrice_curenta : hunMatrix;
+    renderHunMatrix(mat, it.linii_taiate||[], it.coloane_taiate||[],
+      it.zerouri_incadrate ? Object.entries(it.zerouri_incadrate).map(([r,c])=>[+r,+c]) : [],
+      it.zerouri_barate ? it.zerouri_barate.map(p=>Array.isArray(p)?p:[p[0],p[1]]) : [],
+      []);
+    document.getElementById('hun-badge').textContent = t('hunStepBadge', {cur: i + 1, total: iteratii.length});
+
+    addHunStep(it, i);
+    i++;
+    setTimeout(go, 600);
+  };
+  go();
+}
+
+function addHunStep(it, idx) {
+  const log = document.getElementById('hun-log');
+  const div = document.createElement('div');
+  div.className = 'step-card '+(it.stop?'done':'info');
+  div.style.animationDelay='0s';
+  const tag = it.stop ? t('tagDone') : t('tagInfo');
+  div.innerHTML = `<span class="step-tag tag-${tag}">${tag}</span><br>
+    ${t('stepLabel', {n: it.iteratie + 1})} ${it.descriere||'—'}<br>
+    ${t('zeroesLabel')} <span class="val">${it.n0}</span> / <span class="val">${it.n}</span>`;
+  log.appendChild(div);
+  div.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+function renderHunMatrix(mat, covRows, covCols, starZeros, primeZeros, assigned) {
+  const wrap = document.getElementById('hun-matrix-wrap');
+  let html=`<table class="cost-matrix"><thead><tr><th></th>
+    ${VULNS.map(v=>`<th>${v}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  for (let i=0;i<5;i++) {
+    html+=`<tr><td class="rh">${EXPERTS[i]}</td>`;
+    for (let j=0;j<5;j++) {
+      const isStar = starZeros.some(([r,c])=>r===i&&c===j);
+      const isPrime= primeZeros.some(([r,c])=>r===i&&c===j);
+      const isAsgn = assigned.some(([r,c])=>r===i&&c===j);
+      let cls='';
+      if (isAsgn) cls='cell-optimal';
+      else if (covRows.includes(i)&&covCols.includes(j)) cls='cell-covrow cell-covcol';
+      else if (covRows.includes(i)) cls='cell-covrow';
+      else if (covCols.includes(j)) cls='cell-covcol';
+      else if (isStar) cls='cell-star';
+      else if (isPrime) cls='cell-prime';
+      else if (mat[i]&&mat[i][j]===0) cls='cell-zero';
+
+      const v = (mat[i]&&mat[i][j]!==undefined) ? mat[i][j] : hunMatrix[i][j];
+      let disp = (v===null||v===undefined||v===Infinity)?'∞':v;
+      if (isStar&&!isAsgn) disp+='★';
+      if (isPrime) disp+='′';
+      html+=`<td class="${cls}">${disp}</td>`;
+    }
+    html+=`</tr>`;
+  }
+  html+=`</tbody></table>`;
+  wrap.innerHTML=html;
+}
+
+function renderAssignment(alocare) {
+  const wrap = document.getElementById('hun-assign-wrap');
+  const title = currentLang === 'ro' ? 'ALOCARE FINALĂ OPTIMĂ' : 'OPTIMAL FINAL ASSIGNMENT';
+  wrap.innerHTML=`<div class="section-title" style="margin-top:18px">${title}</div>
+    <div class="assign-list">
+    ${alocare.map((a,k)=>`<div class="assign-item best" style="animation-delay:${k*0.08}s">
+      <span>${a.expert}</span>
+      <span class="assign-arrow">→</span>
+      <span>${a.vuln}</span>
+      <span class="assign-cost">${a.cost}h</span>
+    </div>`).join('')}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════
+// EXPORT LOGS
+// ═══════════════════════════════════════════
+function exportLog(type) {
+  const lines = type==='aff' ? affLogLines : hunLogLines;
+  if (!lines||!lines.length) { alert(t('exportNeedRun')); return; }
+  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=type==='aff'?'log_ford_fulkerson.txt':'log_ungar.txt';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function switchSection(sec) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+sec).classList.add('active');
+  document.querySelectorAll('.nav-tab')[sec==='aff'?0:1].classList.add('active');
+  if (sec==='aff') { resizeCanvas(); if (!networkData) fetchNewNetwork(); else drawGraph(); }
+}
+
+function showLoading(show, msg='') {
+  const el = document.getElementById('aff-loading');
+  el.classList.toggle('show', show);
+  if (!msg) return;
+  const node = document.getElementById('loading-msg');
+  if (typeof msg === 'string') {
+    node.textContent = msg;
+    return;
+  }
+  const txt = msg[currentLang] || msg.ro || msg.en || '';
+  node.textContent = txt;
+  if (msg.ro) node.setAttribute('data-ro', msg.ro);
+  if (msg.en) node.setAttribute('data-en', msg.en);
+}
+
+function resetState() {
+  networkData=null; solveResult=null;
+  iterHistory=[]; currentStep=-1;
+  stopPlay();
+  document.getElementById('iter-log').innerHTML='';
+  document.getElementById('iter-badge').textContent='—';
+  ['res-flow','res-cut','res-iter','res-vuln'].forEach(id=>document.getElementById(id).textContent='—');
+  setNavBtns(false,false);
+}
+
+function resetIterState() {
+  iterHistory=[]; currentStep=-1;
+  stopPlay();
+  document.getElementById('iter-log').innerHTML='';
+  document.getElementById('iter-badge').textContent='—';
+  setNavBtns(false,false);
+}
+
+async function shutdownApp() {
+  if (!confirm(t('confirmClose'))) return;
+  try {
+    await fetch(`${API_BASE}/shutdown`, {method: 'POST'});
+  } catch {}
+  try { window.close(); } catch {}
+}
+
+function resizeCanvas() {
+  const canvas=document.getElementById('graph-canvas');
+  const panel=canvas.parentElement;
+  canvas.width=panel.clientWidth;
+  canvas.height=panel.clientHeight;
+  if (networkData) { layoutNodes(); drawGraph(); }
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+window.addEventListener('load', () => {
+  resizeCanvas();
+  checkHealth();
+  setInterval(checkHealth, 10000);
+  fetchNewNetwork();
+  initHunMatrix();
+});
+window.addEventListener('resize', resizeCanvas);
+
+// ═══════════════════════════════════════════
+// LANGUAGE TOGGLE (RO / EN)
+// ═══════════════════════════════════════════
+let currentLang = 'ro';
+
+function toggleLang() {
+  currentLang = currentLang === 'ro' ? 'en' : 'ro';
+  const btn = document.getElementById('lang-btn');
+  if (btn) btn.textContent = currentLang === 'ro' ? 'RO' : 'EN';
+  document.documentElement.setAttribute('lang', currentLang);
+
+  // Update all elements with data-ro / data-en attributes
+  document.querySelectorAll('[data-ro]').forEach(el => {
+    const txt = el.getAttribute('data-' + currentLang);
+    if (txt !== null) el.textContent = txt;
+  });
+
+  // Title attributes (buttons with data-XX-title)
+  document.querySelectorAll('[data-ro-title]').forEach(el => {
+    const attrKey = 'data-' + currentLang + '-title';
+    const txt = el.getAttribute(attrKey);
+    if (txt !== null) el.setAttribute('title', txt);
+  });
+
+  checkHealth();
+}
+</script>
+</body>
+</html>
