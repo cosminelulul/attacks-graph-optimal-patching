@@ -107,6 +107,7 @@ python grafuri.py
 http://localhost:5000
 ```
 
+
 Stop the server at any time with `Ctrl+C` in the terminal.
 
 ### License
