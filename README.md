@@ -87,7 +87,7 @@ The algorithm's steps are visualized interactively in the cost matrix: row and c
 
 The implementation strictly follows the course materials:
 
-- **Lecture 10 : Graph Theory — Fundamentals + Ford's Algorithm
+- **Lecture 10**: Graph Theory — Fundamentals + Ford's Algorithm
 - **Lecture 11** : Assignment Problems, Hungarian Algorithm (KUHN)
 - **Seminar 10** : Network Flow, Ford-Fulkerson Algorithm
 - **Seminar 11**: Assignment Problems, Hungarian Algorithm
