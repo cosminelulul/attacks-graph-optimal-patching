@@ -1,5 +1,3 @@
-
-
 import math
 import random
 from collections import deque
@@ -23,7 +21,6 @@ class Graf:
 
 
     def adauga_varf(self, varf) -> None:
-        """Adauga varful `varf` in multimea X daca nu exista deja."""
         if varf not in self.Gamma:
             self.X.append(varf)
             self.Gamma[varf] = {}
@@ -37,7 +34,6 @@ class Graf:
             self.Gamma[xj][xi] = valoare
 
     def elimina_arc(self, xi, xj) -> None:
-        """Elimina arcul (xi, xj) din graf."""
         if xi in self.Gamma and xj in self.Gamma[xi]:
             del self.Gamma[xi][xj]
         if not self.orientat:
@@ -68,9 +64,6 @@ class Graf:
 
 
     def ordin(self) -> int:
-        """
-        Definitia 1 (Curs 4): card(X) = |X| = n reprezinta ordinul grafului.
-        """
         return len(self.X)
 
     def numar_arce(self) -> int:
@@ -82,7 +75,6 @@ class Graf:
         return dict(self.Gamma.get(xi, {}))
 
     def gamma_minus(self, xi) -> dict:
-
         pred = {}
         for xk in self.X:
             if xi in self.Gamma.get(xk, {}):
@@ -215,9 +207,6 @@ class Graf:
                         total += cap
         return total
 
-    # ----------------------------------------------------------
-    # Reprezentare text (pentru UI)
-    # ----------------------------------------------------------
 
     def __repr__(self) -> str:
         tip = "orientat" if self.orientat else "neorientat"
@@ -228,7 +217,6 @@ class Graf:
         return "\n".join(linii)
 
     def la_dict(self) -> dict:
-        """Serializeaza graful intr-un dict simplu (util pentru UI)."""
         return {
             "orientat": self.orientat,
             "varfuri": list(self.X),
