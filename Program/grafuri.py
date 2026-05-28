@@ -1,15 +1,4 @@
-"""
-grafuri.py — Biblioteca Teoria Grafurilor
-==========================================
-Bazata pe suportul de curs:
-  - Curs 10 Teoria Grafurilor (Generalitati) + Algoritmul Ford
-  - Curs 11: Probleme de Afectare, Algoritmul Ungar (KUHN)
-  - Seminar 10: Flux in Retele, Algoritmul Ford-Fulkerson
-  - Seminar 11: Probleme de Afectare, Algoritmul Ungar
-Toate functiile returneaza structuri de date (dict, list, tuple) si jurnale
-de pasi compatibile cu afisarea prin interfata Tkinter.
-Fara dependente externe — doar biblioteca standard Python.
-"""
+
 
 import math
 import random
@@ -22,37 +11,16 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 
 
-# ============================================================
-# SECTIUNEA I — DEFINITII SI STRUCTURI DE DATE DE BAZA
-# ============================================================
-
 class Graf:
-    """
-    Definitia 1-2 (Curs 4):
-      G = (X, U) unde X = multimea varfurilor, U = multimea arcelor.
-    Suporta:
-      - grafuri orientate (digraf)
-      - grafuri neorientate (muchii)
-      - capacitati / valori pe arce
-    Reprezentare interna: lista de adiacenta (dict of dict).
-    """
+
 
     def __init__(self, orientat: bool = True):
-        """
-        Parametri
-        ---------
-        orientat : True  => graf orientat (digraf)   — arcele (xi, xj) au sens
-                   False => graf neorientat            — muchiile nu au sens
-        """
         self.orientat = orientat
         # X — multimea varfurilor
         self.X: list = []
         # Gamma: xi -> {xj: valoare_arc}  (Definitia 1, Curs 4)
         self.Gamma: dict = {}
 
-    # ----------------------------------------------------------
-    # Constructie graf
-    # ----------------------------------------------------------
 
     def adauga_varf(self, varf) -> None:
         """Adauga varful `varf` in multimea X daca nu exista deja."""
@@ -61,11 +29,7 @@ class Graf:
             self.Gamma[varf] = {}
 
     def adauga_arc(self, xi, xj, valoare: float = 1.0) -> None:
-        """
-        Adauga arcul (xi, xj) cu capacitatea/valoarea data.
-        Definitia 2 (Curs 4): perechea (xi, xj) ∈ U se numeste arc.
-        Pentru grafuri neorientate se adauga ambele sensuri.
-        """
+
         self.adauga_varf(xi)
         self.adauga_varf(xj)
         self.Gamma[xi][xj] = valoare
@@ -81,11 +45,7 @@ class Graf:
                 del self.Gamma[xj][xi]
 
     def multimea_arcelor(self) -> list:
-        """
-        Returneaza U = {(xi, xj, valoare)} — multimea arcelor grafului.
-        Observatie 1.2 punctul 4 (Curs 4):
-          U = {(x, y) | x ∈ X, y ∈ Gamma(x)}
-        """
+
         arce = []
         vazute = set()
         for xi in self.X:
@@ -100,16 +60,12 @@ class Graf:
         return arce
 
     def valoare_arc(self, xi, xj) -> float:
-        """Returneaza valoarea / capacitatea arcului (xi, xj). INF daca nu exista."""
         return self.Gamma.get(xi, {}).get(xj, math.inf)
 
     def exista_arc(self, xi, xj) -> bool:
-        """Verifica daca arcul (xi, xj) exista in graf."""
         return xj in self.Gamma.get(xi, {})
 
-    # ----------------------------------------------------------
-    # Proprietati de baza (Observatia 1.2, Curs 4)
-    # ----------------------------------------------------------
+
 
     def ordin(self) -> int:
         """
@@ -118,20 +74,15 @@ class Graf:
         return len(self.X)
 
     def numar_arce(self) -> int:
-        """Numarul total de arce |U|."""
+
         return len(self.multimea_arcelor())
 
     def gamma_plus(self, xi) -> dict:
-        """
-        Gamma+(xi) = {xj ∈ X | (xi, xj) ∈ U} — multimea succesorilor lui xi.
-        Observatie 1.2 punctul 3 (Curs 4).
-        """
+
         return dict(self.Gamma.get(xi, {}))
 
     def gamma_minus(self, xi) -> dict:
-        """
-        Gamma-(xi) = {xk ∈ X | (xk, xi) ∈ U} — multimea predecesorilor lui xi.
-        """
+
         pred = {}
         for xk in self.X:
             if xi in self.Gamma.get(xk, {}):
@@ -139,55 +90,37 @@ class Graf:
         return pred
 
     def grad_exterior(self, xi) -> int:
-        """d+(xi) = |Gamma+(xi)| — gradul exterior al varfului xi."""
         return len(self.Gamma.get(xi, {}))
 
     def grad_interior(self, xi) -> int:
-        """d-(xi) = |Gamma-(xi)| — gradul interior al varfului xi."""
         return len(self.gamma_minus(xi))
 
     def grad(self, xi) -> int:
-        """
-        Pentru grafuri neorientate: d(xi) = numarul muchiilor incidente cu xi.
-        Pentru grafuri orientate: d(xi) = d+(xi) + d-(xi).
-        """
         if self.orientat:
             return self.grad_exterior(xi) + self.grad_interior(xi)
         return len(self.Gamma.get(xi, {}))
 
     def este_izolat(self, xi) -> bool:
-        """Varful xi este izolat daca Gamma+(xi) = ∅ si Gamma-(xi) = ∅."""
         return self.grad_exterior(xi) == 0 and self.grad_interior(xi) == 0
 
     def varfuri_adiacente(self, xi) -> list:
-        """Returneaza lista varfurilor adiacente cu xi."""
         vecini = set(self.Gamma.get(xi, {}).keys())
         if self.orientat:
             vecini |= set(self.gamma_minus(xi).keys())
         return list(vecini)
 
-    # ----------------------------------------------------------
-    # Clasificarea grafurilor (Observatia 1.3, Curs 4)
-    # ----------------------------------------------------------
+
 
     def este_finit(self) -> bool:
-        """Un graf este finit daca multimea X este finita (card(X) = n, n ∈ N*)."""
         return True  # implementarea suporta doar grafuri finite
 
     def are_bucle(self) -> bool:
-        """Verifica daca graful are bucle (xi, xi) ∈ U."""
         return any(xi in self.Gamma.get(xi, {}) for xi in self.X)
 
     def este_simplu(self) -> bool:
-        """Un graf simplu nu are bucle si nu are arce multiple."""
         return not self.are_bucle()
 
     def este_conex(self) -> bool:
-        """
-        Observatie (Seminar 10): G finit, conex daca pentru orice 2 varfuri x, y
-        exista un lant care le uneste.
-        Verificare prin BFS din primul varf.
-        """
         if not self.X:
             return True
         vizitat = set()
@@ -207,11 +140,6 @@ class Graf:
         return len(vizitat) == len(self.X)
 
     def este_retea(self, sursa, destinatie) -> bool:
-        """
-        Definitie (Seminar 10): G = (X, U) finit, conex, fara bucle este
-        graf-retea daca exista sursa xS cu Gamma-(xS) = ∅ si destinatie xt
-        cu Gamma+(xt) = ∅.
-        """
         if not self.orientat:
             return False
         if not self.este_conex():
@@ -222,15 +150,8 @@ class Graf:
         dest_ok = len(self.Gamma.get(destinatie, {})) == 0
         return sursa_ok and dest_ok
 
-    # ----------------------------------------------------------
-    # Subgraf si Graf Partial (Definitiile 3-4, Curs 4)
-    # ----------------------------------------------------------
 
     def subgraf(self, X_prim: list) -> "Graf":
-        """
-        Definitia 3 (Curs 4): G' = (X', Gamma') subgraf al lui G daca
-        X' ⊂ X si Gamma'(x) = X' ∩ Gamma(x) pentru orice x ∈ X'.
-        """
         g = Graf(orientat=self.orientat)
         for v in X_prim:
             if v in self.Gamma:
@@ -242,11 +163,6 @@ class Graf:
         return g
 
     def graf_partial(self, arce_selectate: list) -> "Graf":
-        """
-        Definitia 4 (Curs 4): G' = (X, Gamma') graf partial al lui G daca
-        multimea suport X este aceeasi si Gamma' ⊆ Gamma, pentru orice x ∈ X.
-        `arce_selectate` — lista de tuple (xi, xj).
-        """
         g = Graf(orientat=self.orientat)
         for v in self.X:
             g.adauga_varf(v)
@@ -256,16 +172,8 @@ class Graf:
                 g.adauga_arc(xi, xj, self.valoare_arc(xi, xj))
         return g
 
-    # ----------------------------------------------------------
-    # Drumuri si lanturi (Definitia 5+, Curs 4)
-    # ----------------------------------------------------------
 
     def este_drum(self, secventa: list) -> bool:
-        """
-        Un drum este o succesiune de arce {u1, u2, ..., uk} ale caror
-        extremitati se potrivesc (Curs 4, Def. drum).
-        `secventa` — lista de varfuri [x0, x1, ..., xk].
-        """
         for i in range(len(secventa) - 1):
             if not self.exista_arc(secventa[i], secventa[i + 1]):
                 return False
@@ -279,46 +187,24 @@ class Graf:
         return len(arce) == len(set(arce))
 
     def este_drum_elementar(self, secventa: list) -> bool:
-        """
-        Drum elementar: nu trece de 2 ori prin acelasi varf
-        (xi ≠ xj, ∀i ≠ j, i,j = 1,...,k+1). Curs 4.
-        """
         return self.este_drum_simplu(secventa) and len(secventa) == len(set(secventa))
 
     def este_circuit(self, secventa: list) -> bool:
-        """
-        Circuit: drum care pleaca si se termina in acelasi varf [x0...xk, x0].
-        Curs 4.
-        """
         return (len(secventa) > 1 and
                 secventa[0] == secventa[-1] and
                 self.este_drum_simplu(secventa))
 
     def valoare_drum(self, secventa: list) -> float:
-        """
-        Definitia valorii unui drum (Curs 4):
-          f(µ) = suma valorilor arcelor care il compun.
-        """
         if not self.este_drum(secventa):
             return math.inf
         return sum(self.valoare_arc(secventa[i], secventa[i + 1])
                    for i in range(len(secventa) - 1))
 
     def lungime_drum(self, secventa: list) -> int:
-        """Lungimea drumului = numarul de arce (Curs 4)."""
         return len(secventa) - 1
 
-    # ----------------------------------------------------------
-    # Taietura (Seminar 10)
-    # ----------------------------------------------------------
 
     def capacitate_taietura(self, A: set, sursa, destinatie) -> float:
-        """
-        Seminar 10: A ⊂ X, xS ∉ A, xt ∈ A reprezinta o taietura.
-        Capacitatea taieturii:
-          C(UA-) = suma c(u) pentru u ∈ UA-,
-          UA- = {(xi, xj) | xi ∉ A, xj ∈ A}
-        """
         if sursa in A or destinatie not in A:
             return math.inf
         total = 0.0
@@ -350,42 +236,8 @@ class Graf:
         }
 
 
-# ============================================================
-# SECTIUNEA II — ALGORITMUL FORD (drumuri de valoare minima)
-# ============================================================
 
 def algoritmul_ford(graf: Graf, sursa) -> dict:
-    """
-    Algoritmul Ford (Curs 4, II.2) — drumuri de valoare minima intr-un graf
-    cu pondere, incepand din varful sursa xS.
-
-    Pasul 1 (Iteratia I0):
-      lambda[i] = 0   daca i == S
-      lambda[i] = INF daca i != S
-      Se parcurge lista arcelor; daca lambda[j] - lambda[i] > f(xi, xj)
-      atunci lambda[j] <- lambda[i] + f(xi, xj)  (si se marcheaza arcul).
-
-    Iteratia Ik (k >= 1):
-      Se repeta parcurgerea arcelor cu aceeasi regula de relaxare.
-
-    Test de optimalitate (TO):
-      Daca la o parcurgere completa nu s-a facut nicio modificare => STOP.
-      Iteratia ISTOP reprezinta solutia.
-
-    Parametri
-    ---------
-    graf   : Graf orientat cu valori pe arce (f(xi, xj) >= 0)
-    sursa  : varful de start xS
-
-    Returneaza
-    ----------
-    dict cu:
-      "lambda"       : {varf: valoare_minima} — distantele minime de la sursa
-      "predecesori"  : {varf: predecesorul pe drumul minim} (pentru reconstructia drumului)
-      "iteratii"     : lista de dict-uri — jurnalul fiecarei iteratii (pentru UI)
-      "arce_marcate" : lista arcelor marcate cu (*) la ISTOP (graful solutie)
-      "ISTOP"        : numarul iteratiei de stop
-    """
     INF = math.inf
     arce = graf.multimea_arcelor()  # lista fixa de arce (orice ordine)
 
@@ -447,22 +299,6 @@ def algoritmul_ford(graf: Graf, sursa) -> dict:
 
 
 def drum_minim_ford(graf: Graf, sursa, destinatie) -> dict:
-    """
-    Determina drumul de valoare minima de la sursa la destinatie
-    folosind Algoritmul Ford.
-
-    Pasul 2 — Solutia problemei (Curs 4, Observatia 2.2):
-      Drumul minim µ1 = [xS, xl1, xl2, ..., xDest] se reconstituie
-      urmand predecesorii marcati cu (*) de la destinatie la sursa.
-
-    Returneaza
-    ----------
-    dict cu:
-      "drum"       : lista de varfuri de la sursa la destinatie
-      "valoare"    : valoarea (lungimea ponderata) a drumului
-      "ford"       : rezultatul complet al algoritmului Ford
-      "mesaj"      : text descriptiv (pentru UI)
-    """
     ford = algoritmul_ford(graf, sursa)
     lam = ford["lambda"]
     pred = ford["predecesori"]
@@ -474,8 +310,6 @@ def drum_minim_ford(graf: Graf, sursa, destinatie) -> dict:
             "ford": ford,
             "mesaj": f"Nu exista drum de la {sursa} la {destinatie}.",
         }
-
-    # Reconstructia drumului (Pasul 2 — graful solutie)
     drum = []
     varf_curent = destinatie
     while varf_curent is not None:
@@ -493,47 +327,8 @@ def drum_minim_ford(graf: Graf, sursa, destinatie) -> dict:
     }
 
 
-# ============================================================
-# SECTIUNEA III — ALGORITMUL FORD-FULKERSON (flux maxim in retele)
-# ============================================================
 
 def algoritmul_ford_fulkerson(capacitati: dict, sursa, destinatie) -> dict:
-    """
-    Algoritmul Ford-Fulkerson (Seminar 10) — determinarea fluxului maxim
-    intr-un graf-retea G = (X, U).
-
-    Functia flux f: U -> R satisface:
-      1. 0 <= f(u) <= c(u),  ∀u ∈ U  (conditia de capacitate)
-      2. Σ f(xi,xk) = Σ f(xk,xj),  ∀k != S, t  (conservarea fluxului)
-      3. V(f) = Σ f(xS,xi) = Σ f(xj,xt)  (valoarea fluxului)
-
-    Procedura de etichetare (Pasul 2, Seminar 10):
-      Arc nesaturat (xi -> xj, f < c) si xi etichetat => xj primeste [+xi]
-      Arc cu flux > 0 (xj -> xi) si xj etichetat  => xi primeste [-xj]
-        (doar daca xi nu poate fi etichetat altfel)
-
-    Iteratii:
-      I0   : se determina un flux initial f0 (lanturi de la S la t)
-      Ik   : procedura de etichetare; se cauta drum de ameliorare;
-             daca se atinge destinatia => crestem fluxul cu min rezidual;
-             daca NU se atinge         => STOP (flux maxim atins).
-
-    Parametri
-    ---------
-    capacitati : dict {(xi, xj): capacitate} — capacitatile arcelor
-    sursa      : varful sursa xS
-    destinatie : varful destinatie xt
-
-    Returneaza
-    ----------
-    dict cu:
-      "flux_maxim"  : valoarea fluxului maxim V(f)
-      "flux"        : {(xi,xj): valoare_flux} — fluxul pe fiecare arc
-      "iteratii"    : jurnalul tuturor iteratiilor (pentru UI)
-      "taietura"    : multimea arcelor care formeaza taietura minima
-      "cap_taietura": capacitatea taieturii minime (= flux maxim)
-      "ISTOP"       : iteratia de stop
-    """
     # Construim multimea varfurilor
     varfuri = set()
     for (xi, xj) in capacitati:
@@ -642,12 +437,9 @@ def algoritmul_ford_fulkerson(capacitati: dict, sursa, destinatie) -> dict:
         iteratii_log.append(log_etichetare)
         iteratie_nr += 1
 
-    # ── Valoarea fluxului maxim ──
     flux_maxim = sum(flux.get((sursa, xj), 0)
                      for xj in varfuri if (sursa, xj) in capacitati)
 
-    # ── Determinarea taieturii minime ──
-    # A = multimea varfurilor accesibile din sursa in graful rezidual la ISTOP
     A = set(etichete.keys())
     taietura = []
     for (xi, xj), cap in capacitati.items():
@@ -673,14 +465,6 @@ def algoritmul_ford_fulkerson(capacitati: dict, sursa, destinatie) -> dict:
 
 
 def verifica_flux(flux: dict, capacitati: dict, sursa, destinatie) -> dict:
-    """
-    Verifica conditiile de flux (Seminar 10):
-      1. 0 <= f(u) <= c(u) pentru orice arc u
-      2. Conservarea fluxului: Σ f(xk,xi) = Σ f(xi,xj) pentru xi != S, t
-      3. V(f) = Σ f(xS,xi) = Σ f(xj,xt)
-
-    Returneaza dict cu rezultatele verificarii (pentru UI).
-    """
     varfuri = set()
     for (xi, xj) in capacitati:
         varfuri.add(xi)
@@ -716,19 +500,9 @@ def verifica_flux(flux: dict, capacitati: dict, sursa, destinatie) -> dict:
     }
 
 
-# ============================================================
-# SECTIUNEA IV — GRAFUL BIPARTIT (pentru Algoritmul Ungar)
-# ============================================================
 
 class GrafBipartit:
-    """
-    Definitia 1-2 (Curs 6): G = (X ∪ Y, U) graf simplu bipartit finit.
-    Conditii:
-      i)  X, Y ≠ ∅
-      ii) X ∪ Y = V
-      iii)X ∩ Y = ∅
-      Orice muchie (xi, yj) ∈ U are o extremitate in X si cealalta in Y.
-    """
+
 
     def __init__(self, X: list, Y: list):
         if set(X) & set(Y):
@@ -739,7 +513,6 @@ class GrafBipartit:
         self.U: dict = {x: {} for x in X}
 
     def adauga_muchie(self, xi, yj, valoare: float = 1.0) -> None:
-        """Adauga muchia (xi, yj) cu valoarea data."""
         if xi not in self.X:
             raise ValueError(f"{xi} nu apartine lui X.")
         if yj not in self.Y:
@@ -747,24 +520,18 @@ class GrafBipartit:
         self.U[xi][yj] = valoare
 
     def valoare_muchie(self, xi, yj) -> float:
-        """Valoarea muchiei (xi, yj). INF daca nu exista cuplaj posibil."""
         return self.U.get(xi, {}).get(yj, math.inf)
 
     def multimea_muchiilor(self) -> list:
-        """Returneaza U = [(xi, yj, val)] — multimea muchiilor."""
         return [(xi, yj, val)
                 for xi in self.X
                 for yj, val in self.U[xi].items()]
 
     def gamma(self, xi) -> list:
-        """Gamma(xi) = {yj ∈ Y | (xi, yj) ∈ U} — vecinii lui xi in Y."""
         return list(self.U.get(xi, {}).keys())
 
     def este_cuplaj(self, W: list) -> bool:
-        """
-        Definitia 3 (Curs 6): W ⊆ U este cuplaj daca oricare doua muchii
-        din W nu sunt adiacente (nu impart un varf comun).
-        """
+
         x_folositi, y_folositi = set(), set()
         for (xi, yj) in W:
             if xi in x_folositi or yj in y_folositi:
@@ -774,10 +541,7 @@ class GrafBipartit:
         return True
 
     def valoare_cuplaj(self, W: list) -> float:
-        """
-        Definitia 6 (Curs 6): Valoarea unui cuplaj = suma valorilor
-        muchiilor care il formeaza. V(W) = Σ c(xi,yj) pentru (xi,yj) ∈ W.
-        """
+
         return sum(self.valoare_muchie(xi, yj) for (xi, yj) in W)
 
     def dimensiune_cuplaj(self, W: list) -> int:
@@ -785,71 +549,9 @@ class GrafBipartit:
         return len(W)
 
 
-# ============================================================
-# SECTIUNEA V — ALGORITMUL UNGAR (KUHN)
-# ============================================================
+
 
 def algoritmul_ungar(matrice_costuri: list, minimizare: bool = True) -> dict:
-    """
-    Algoritmul Ungar (KUHN) — Curs 6 + Seminar 11.
-    Determina cuplajul maximal de valoare optima (minima sau maxima)
-    pentru o problema de afectare n x n.
-
-    Etapele algoritmului:
-    ─────────────────────
-    Pasul 1 — Matricea costurilor (Seminar 11, Pasul 1):
-      Se construieste matricea patrata C = (cij). Daca nu exista cuplaj
-      intre xi si yj => cij = ∞.
-
-    Pasul 2 — Crearea de zerouri (Seminar 11, Pasul 2):
-      a) Se scade din fiecare linie minimul sau:
-           ui = min_j(cij),  c^ij = cij - ui
-      b) Daca exista coloane fara zero:
-           vj = min_i(c^ij),  c~ij = c^ij - vj
-
-    Pasul 3 — Procedura de etichetare {0, 0̄} (Seminar 11, Pasul 3):
-      - Se cauta liniile cu cele mai putine zerouri;
-      - Se incadreaza un zero [0] si se bareaza [0̄] celelalte zerouri
-        de pe linia si coloana respectiva;
-      - Se numara zerourile incadrate n[0].
-      - Daca n[0] = n => STOP, solutia e cuplajul maximal.
-      - Daca n[0] < n => continuam cu Pasul 4.
-
-    Pasul 4 — Suportul minim — procedura de marcaj (Seminar 11, Pasul 4):
-      (1) Marcam cu (*) liniile fara 0 incadrat;
-      (2) Marcam cu (*) coloanele cu 0 barat pe linii marcate L(*);
-      (3) Marcam cu (*) liniile cu 0 incadrat pe coloane marcate C(*);
-      (4) Repetam (2)-(3) pana la STOP marcaj.
-      S = {linii nemarcate} ∪ {coloane marcate}
-
-    Pasul 5 — Deplasarea de zerouri (Seminar 11, Pasul 5):
-      T1 = elemente netaiate \ {0}
-      T2 = elemente taiate o singura data
-      T3 = elemente taiate de doua ori
-      ε = min(T1)
-      T1 <- T1 - ε,  T3 <- T3 + ε,  T2 neschimbate
-      Se reia de la Pasul 3.
-
-    Pasul 6 — Valoarea cuplajului maxim (Seminar 11, Pasul 6):
-      v(Wmax) = Σ ui + Σ vj + Σ εk * (n - n[0]k)
-
-    Parametri
-    ---------
-    matrice_costuri : lista 2D (n x n) cu valorile cij
-    minimizare      : True => min v(W),  False => max v(W)
-
-    Returneaza
-    ----------
-    dict cu:
-      "cuplaj"          : lista [(i, j)] — perechile din cuplajul maximal
-      "valoare"         : v(Wmax) — valoarea optima a cuplajului
-      "iteratii"        : jurnalul tuturor iteratiilor (pentru UI)
-      "matrice_finala"  : matricea modificata la ISTOP
-      "n"               : dimensiunea problemei
-      "minimizare"      : tipul optimizarii
-      "mesaj"           : text descriptiv (pentru UI)
-      "verificare"      : valoarea calculata prin formula de verificare
-    """
     import copy
 
     n = len(matrice_costuri)
@@ -871,7 +573,6 @@ def algoritmul_ungar(matrice_costuri: list, minimizare: bool = True) -> dict:
 
     iteratii_log = []
 
-    # ── Pasul 1: Minimele pe linii (ui) ──
     u = []  # minimele pe linii
     for i in range(n):
         fin = [C[i][j] for j in range(n) if C[i][j] != INF]
@@ -880,7 +581,6 @@ def algoritmul_ungar(matrice_costuri: list, minimizare: bool = True) -> dict:
             if C[i][j] != INF:
                 C[i][j] -= u[-1]
 
-    # ── Pasul 2: Minimele pe coloane (vj) ──
     v = []  # minimele pe coloane
     for j in range(n):
         fin = [C[i][j] for i in range(n) if C[i][j] != INF]
@@ -893,16 +593,6 @@ def algoritmul_ungar(matrice_costuri: list, minimizare: bool = True) -> dict:
     epsiloane = []  # lista cu (epsilon, n0_iter)
 
     def procedura_etichetare(C):
-        """
-        Pasul 3 — Etichetare {0, 0̄}.
-        Determina cuplajul MAXIM de zerouri folosind augmenting paths
-        (algoritmul Hopcroft-Karp simplificat), apoi bareaza celelalte zerouri
-        de pe liniile si coloanele cu zero incadrat.
-        Returneaza (cuplaj_incadrat, zerouri_barate, n0).
-        cuplaj_incadrat: {i: j} — zero incadrat pe linia i, coloana j
-        zerouri_barate:  set of (i, j) — zerouri barate
-        """
-        # ── Gasim cuplajul maxim de zerouri prin augmenting paths ──
         match_row = {}  # {i: j}
         match_col = {}  # {j: i}
 
@@ -938,10 +628,6 @@ def algoritmul_ungar(matrice_costuri: list, minimizare: bool = True) -> dict:
         return incadrat, barate, n0
 
     def procedura_marcaj(incadrat, barate):
-        """
-        Pasul 4 — Suport minim.
-        Returneaza (linii_marcate, coloane_marcate, suport_min).
-        """
         # (1) Marcam liniile fara zero incadrat
         linii_marcate = set(i for i in range(n) if i not in incadrat)
         coloane_marcate = set()
@@ -963,16 +649,6 @@ def algoritmul_ungar(matrice_costuri: list, minimizare: bool = True) -> dict:
         return linii_marcate, coloane_marcate
 
     def deplasare_zerouri(C, linii_marcate, coloane_marcate):
-        """
-        Pasul 5 — Deplasare zerouri (Seminar 11, Pasul 5).
-        Definitii:
-          Linii taiate   = L(fara *)  = linii NEMARCATE   = set(range(n)) - linii_marcate
-          Coloane taiate = C(*)       = coloane MARCATE    = coloane_marcate
-          T1 = elemente NETAIATE (nici linia nici coloana taiata), exclusiv 0
-          T2 = elemente taiate O SINGURA data (ori linie ori coloana, nu ambele)
-          T3 = elemente taiate DE DOUA ORI (linia SI coloana taiata)
-        Formula: eps = min(T1); T1 <- T1 - eps; T3 <- T3 + eps; T2 neschimbat.
-        """
         linii_nemarcate = set(range(n)) - linii_marcate  # = L(fara *) = linii taiate
 
         T1_vals = []
@@ -1080,18 +756,9 @@ def algoritmul_ungar(matrice_costuri: list, minimizare: bool = True) -> dict:
     }
 
 
-# ============================================================
-# SECTIUNEA VI — TEOREME SI PROPRIETATI STRUCTURALE
-# ============================================================
+
 
 def teorema_konig_hall(graf_bipartit: GrafBipartit) -> dict:
-    """
-    Teorema 1 (König-Hall, Curs 6):
-      Se poate cupla X in Y <=> |Γ(A)| >= |A| pentru toate submultimile A ⊆ X.
-    Verificare prin conditia Hall: pentru fiecare A ⊆ X, |N(A)| >= |A|.
-
-    Returneaza dict cu rezultatul verificarii.
-    """
     X = graf_bipartit.X
     n = len(X)
     violari = []
@@ -1123,11 +790,6 @@ def teorema_konig_hall(graf_bipartit: GrafBipartit) -> dict:
 
 
 def teorema_konig_ore(graf_bipartit: GrafBipartit) -> dict:
-    """
-    Teorema 2 (König-Ore, Curs 6):
-      µ(G) = |X| - max_{A ⊆ X} (|A| - |Γ(A)|)
-    Numarul varfurilor unui suport minim.
-    """
     X = graf_bipartit.X
     n = len(X)
     max_deficit = 0
@@ -1154,12 +816,6 @@ def teorema_konig_ore(graf_bipartit: GrafBipartit) -> dict:
 
 
 def teorema_konig_egervary(graf_bipartit: GrafBipartit) -> dict:
-    """
-    Teorema 3 (König-Egerváry, Curs 6):
-      Intr-un graf simplu bipartit, numarul arcelor unui cuplaj maxim
-      coincide cu numarul varfurilor unui suport minim.
-    Verificare: |Wmax| = µ(G).
-    """
     ore = teorema_konig_ore(graf_bipartit)
     mu = ore["mu"]
 
@@ -1229,12 +885,6 @@ def teorema_konig_egervary(graf_bipartit: GrafBipartit) -> dict:
 
 def propozitia_1_afectare(matrice_costuri: list, linie_sau_coloana: str,
                            indice: int, alfa: float) -> dict:
-    """
-    Propozitia 1 (Curs 6):
-      Solutia unei probleme de afectare nu se modifica daca la toate elementele
-      unei linii sau coloane se aduna acelasi numar real α.
-    Demonstreaza prin calculul valorii cuplajului inainte si dupa.
-    """
     import copy
     n = len(matrice_costuri)
     C_nou = copy.deepcopy(matrice_costuri)
@@ -1271,19 +921,9 @@ def propozitia_1_afectare(matrice_costuri: list, linie_sau_coloana: str,
     }
 
 
-# ============================================================
-# SECTIUNEA VII — UTILITARE PENTRU UI (Tkinter-friendly)
-# ============================================================
 
 def matrice_la_text(matrice: list, zerouri_incadrate: dict = None,
                     zerouri_barate: set = None, latime_col: int = 6) -> list:
-    """
-    Converteste o matrice 2D intr-o lista de siruri formatate
-    (compatibil cu Text widget Tkinter).
-    zerouri_incadrate: {i: j} — pozitiile zerourilor incadrate [0]
-    zerouri_barate:    {(i,j)} — pozitiile zerourilor barate [0̄]
-    Returneaza lista de siruri (cate una per rand).
-    """
     n = len(matrice)
     linii = []
     for i in range(n):
@@ -1308,10 +948,6 @@ def matrice_la_text(matrice: list, zerouri_incadrate: dict = None,
 
 
 def flux_la_text(flux: dict, capacitati: dict) -> list:
-    """
-    Afiseaza fluxul pe arce in format: (xi, xj): f / c
-    Returneaza lista de siruri (pentru UI).
-    """
     linii = []
     for (xi, xj), cap in sorted(capacitati.items(), key=lambda x: str(x)):
         f_val = flux.get((xi, xj), 0)
@@ -1320,9 +956,6 @@ def flux_la_text(flux: dict, capacitati: dict) -> list:
 
 
 def iteratii_ford_la_text(iteratii: list) -> list:
-    """
-    Formateaza jurnalul iteratiilor Algoritmului Ford pentru afisare in UI.
-    """
     linii = []
     for it in iteratii:
         linii.append(f"\n{'─' * 50}")
@@ -1341,9 +974,6 @@ def iteratii_ford_la_text(iteratii: list) -> list:
 
 
 def iteratii_fulkerson_la_text(iteratii: list) -> list:
-    """
-    Formateaza jurnalul iteratiilor Ford-Fulkerson pentru afisare in UI.
-    """
     linii = []
     for it in iteratii:
         linii.append(f"\n{'─' * 60}")
@@ -1356,9 +986,6 @@ def iteratii_fulkerson_la_text(iteratii: list) -> list:
 
 
 def iteratii_ungar_la_text(iteratii: list) -> list:
-    """
-    Formateaza jurnalul iteratiilor Algoritmului Ungar pentru afisare in UI.
-    """
     linii = []
     for it in iteratii:
         linii.append(f"\n{'═' * 60}")
@@ -1375,10 +1002,6 @@ def iteratii_ungar_la_text(iteratii: list) -> list:
 
 def cuplaj_la_text(cuplaj: list, matrice_costuri: list,
                    etichetare_x: list = None, etichetare_y: list = None) -> list:
-    """
-    Afiseaza cuplajul in format tabelar cu valori (pentru UI).
-    etichetare_x / etichetare_y: liste de etichete pentru linii / coloane.
-    """
     linii = ["Cuplaj maximal:"]
     for (i, j) in cuplaj:
         xi = etichetare_x[i] if etichetare_x else f"x{i + 1}"
@@ -1390,14 +1013,8 @@ def cuplaj_la_text(cuplaj: list, matrice_costuri: list,
     return linii
 
 
-# ============================================================
-# SECTIUNEA VIII — FUNCTII AUXILIARE DE CONSTRUCTIE RAPIDA
-# ============================================================
 
 def graf_din_lista_arce(arce: list, orientat: bool = True) -> Graf:
-    """
-    Construieste un Graf din lista de tuple (xi, xj) sau (xi, xj, valoare).
-    """
     g = Graf(orientat=orientat)
     for arc in arce:
         if len(arc) == 2:
@@ -1409,10 +1026,6 @@ def graf_din_lista_arce(arce: list, orientat: bool = True) -> Graf:
 
 def graf_din_matrice_adiacenta(matrice: list, varfuri: list = None,
                                 orientat: bool = True) -> Graf:
-    """
-    Construieste un Graf din matricea de adiacenta.
-    0 / None => nu exista arc; orice alta valoare => capacitatea arcului.
-    """
     n = len(matrice)
     etichete = varfuri if varfuri else list(range(1, n + 1))
     g = Graf(orientat=orientat)
@@ -1427,28 +1040,18 @@ def graf_din_matrice_adiacenta(matrice: list, varfuri: list = None,
 
 
 def capacitati_din_lista(arce_cap: list) -> dict:
-    """
-    Construieste dict {(xi, xj): capacitate} din lista de tuple
-    (xi, xj, capacitate) — format cerut de algoritmul_ford_fulkerson.
-    """
     return {(xi, xj): float(cap) for xi, xj, cap in arce_cap}
 
 
 def matrice_costurilor_din_dict(n: int, costuri: dict,
                                  valoare_lipsa: float = math.inf) -> list:
-    """
-    Construieste matricea n x n din dict {(i, j): cost}.
-    Indicii i, j sunt 0-based.
-    """
     C = [[valoare_lipsa] * n for _ in range(n)]
     for (i, j), cost in costuri.items():
         C[i][j] = float(cost)
     return C
 
 
-# ============================================================
-# SECTIUNEA IX — API REST (Flask)
-# ============================================================
+# API REST (Flask)
 
 import sys
 import os
